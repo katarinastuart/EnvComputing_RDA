@@ -1,0 +1,280 @@
+# Ecology and Multivariate Statistics
+# Redundancy Analysis (RDA)
+
+Redundancy analysis (RDA) is a dimension reduction statistical approach for multivariate data sets. Dimension reduction techniques are often used on large, noisy, data sets to strip away any unnecessary components, leaving only those part that best capture any explanatory/predictor power. Even if you have not heard of RDA, it is very possible that you have encounter one of the main linear techniques for dimensionality reduction; principle component analysis (PCA).
+
+Some background reading relevant to what we will be doing:
+
+* [Talbot et al. 2016](https://academic.oup.com/jhered/article/108/2/207/2726867)
+* [Phillips et al. 2006](https://www.nature.com/articles/439803a)
+* [Rollins et al. 2015](https://onlinelibrary.wiley.com/doi/full/10.1111/mec.13184)
+* [Prentis et al. 2008](https://www.ncbi.nlm.nih.gov/pubmed/18467157)
+* [Colautti and Lau 2015](https://onlinelibrary.wiley.com/doi/full/10.1111/mec.13162)
+
+## A quick PCA and RDA overview
+
+PCA is used to discern underlying structures (i.e. principle components) that capture variance in a data set. For more information on the fundamentals of PCA I would recommend visiting [Principal Component Analysis 4 Dummies: Eigenvectors, Eigenvalues and Dimension Reduction](https://georgemdallas.wordpress.com/2013/10/30/principal-component-analysis-4-dummies-eigenvectors-eigenvalues-and-dimension-reduction/).
+
+RDA is similar to PCA, however it incorporates the uses of **response** and **explanatory** variables, whereas analysis such as PCA doesn't incorporate the explanatory variables.
+
+RDA is traditionally used on **response** variables such as:
+
+* SNP (single nucleotide polymorphism) genetic data: see [example](https://popgen.nescent.org/2018-03-27_RDA_GEA.html)
+* Ecological community data: [see example1](https://rgriff23.github.io/2017/05/23/mosquito-community-ecology-in-vegan.html) and [example 2](http://cc.oulu.fi/~jarioksa/opetus/metodi/vegantutor.pdf)
+
+For this example, I have used the vignettes available on the above two links, as well as additional notes from Natalie Hofmeister and myself.
+
+
+## How can we use RDA in other ways?
+
+Below I apply the approach to a multivariate phenotypic dataset. The aim is to see if the environmental data associated with the areas from which the wild-caught toads were collected carry any explanatory power for various phenotypic measures. I.e. we want to explore the link between environment and phenotype. As listed above, RDA can help you pick out environmental correlations in genotype data, and could conceivably be used to link genotype measures to that of phenotype.
+
+<center>
+![Given the right data set, RDA can be used to explore each of the 3 relationship pairs](C:/Users/z5188231/Desktop/Coding/Files/EnvironmentalComputing/AnalysisTriangle.PNG)
+</center>
+
+Use of RDA for the below analysis can be either quantitative or qualitative. The direct RDA outputs may be useful for you, or they may simply serve as an exploratory tool to direct further analysis.
+
+
+## Introducing the data set: Cane Toads!
+
+The following data is one generated from my honours research. It contains phenotype variables for a number of cane toads sourced from one of three states: QLD, NT, or WA.
+
+Let's import the data and have a quick look at it
+
+```{r data_import}
+setwd("C:/Users/z5188231/Desktop/Coding/Files/EnvironmentalComputing")
+ToadData <- read.csv("CaneToad_Phenotypes.csv",stringsAsFactors=TRUE,sep=",")
+str(ToadData)
+```
+We see there is a total of 121 toads in this data set. The first 5 columns of these data denote information about the treatment levels (exercise/diet), source location, clutch, and and individual ID for each toad. The remaining 14 columns the contain phenotypic data.
+
+## Prepare Response and Explanatory data sets
+
+### Step 1.1 Preparing the response dataset (phenotype data)
+
+First we check the data for any missingness, and make sure our matrix does not have any NA's.
+
+```{r check_missing_data}
+sum(is.na(ToadData)) # we see there is 91 missing data
+colnames(ToadData)[colSums(is.na(ToadData)) > 0] #explore data to identify where they are located
+ToadData <- ToadData[c(1:18)] #remove offending data
+sum(is.na(ToadData)) #0 missing data
+```
+
+In the above chunk we discovered 91 pieces of missing information. This is because some variables were not measured across all toads. It appears all the NA's were in the final variable column - *ln.RadioTelemetry.distance*. So to prepare our data for the RDA, we need to remove this offending variable. Make sure to find the most appropriate way to resolve this should your data set have missing values. You may be able to remove rows, remove columns, generate an average etc. but you don't want to reduce your data set drastically or remove too many variables/individuals.
+
+Next we retain only the phenotype data columns, as these are the ones we are interested on conducting the RDA on.
+
+```{r phenotype_data}
+ToadVars <- ToadData[c(6:18)]
+str(ToadVars)
+```
+
+We have now finished preparing the phenotype data (the **response variables**) for our RDA analysis. 
+
+**Some points to consider:**
+
+* Make sure that your response variables are independent. For instance, with this toad data set, I originally had measurements of Body Length, Arm Length, Leg Length etc. These measures would presumably be largely correlated with one another. 
+    + *Solution: To deal with this, either omit redundant response data, or compute it in such a way that it represents a more independent aspect of the phenology (in this case I calculated limb/head lengths as a ratio of total body length).*
+* The data should be normally distributed. 
+    + *Solution: Transform variables that do not comply. The transformation type needed depends on the data, so make sure to do your research. A good place to start is the [Handbook of Biological Statistics](http://www.biostathandbook.com/transformation.html). *
+
+
+### Step 2.1 Preparing the explanatory dataset (environmental data)
+
+The first step here is to grab global climate data from [WorldClim](http://worldclim.org/version2) using the raster package. 
+
+```{r warning=FALSE, message=FALSE}
+library(raster)
+climdata <- getData('worldclim',download=TRUE,var='bio',res=5)
+```
+
+This contains 19 different climate variables, measured globally. From this we want to select only the locations that are relevant for our study. Your metadata file should be just two columns: latitude and longitude for each individual (121), written in the format as below (and in the same order as your response data set). 
+
+```{r}
+setwd("C:/Users/z5188231/Desktop/Coding/Files/EnvironmentalComputing")
+popcoords <- read.csv("metadata.csv",stringsAsFactors=TRUE,sep=",")
+head(popcoords)
+str(popcoords)
+```
+
+How we have all the sample sites, we can pull out the climate data from global dataset for each individual coordinate, and label them in a human readable format (variable names obtained from the [WorldClim](http://worldclim.org/version2) website.
+
+```{r}
+points <- SpatialPoints(popcoords, proj4string=climdata@crs)
+values <- extract(climdata,points)
+envdata <- cbind.data.frame(popcoords,values)
+str(envdata)
+colnames(envdata) <- c("long","lat",
+      "AnnualMeanTemp","MeanDiurnalRange",
+      "Isothermality","TempSeasonality",
+      "MaxTempofWarmestMonth","MinTempofColdestMonth",
+      "TempAnnualRange","MeanTempofWettestQuarter",
+      "MeanTempofDriestQuarter","MeanTempofWarmestQuarter",
+      "MeanTempofColdestQuarter","AnnualPrecipitation",
+      "PrecipitationofWettestMonth","PrecipitationofDriestMonth",
+      "PrecipitationSeasonality","PrecipitationofWettestQuarter",
+      "PrecipitationofDriestQuarter","PrecipitationofWarmestQuarter",
+      "PrecipitationofColdestQuarter")
+str(envdata)
+```
+
+
+
+### Step 2.2 Check which variables are correlated
+
+We mentioned earlier on that we wanted to remove non-independent measures from our response data set. A similar process must be done for the explanatory dataset. Some of our environmental measurement are likely to be highly correlated across our sampling sites. There are several ways of doing this, which will also be informed by your experimental model/questions. If you are particularly interested in specific environmental measures, you may want to leave those in only, and run the RDA. You could also conceivably make the decision based on the ecology and climate of the ecosystems. If you are interested in a more exploratory approach (like we are doing now), then I would recommend using one of the below methods:
+
+*Note: Where possible it is probably best to use method two, however for studies where the sample environments are more similar method one is more appropriate. *
+
+#### Method one: PCA to identify correlated environmental predictors
+
+For this method we use a PCA to determine which variables are colinear. We will run the analysis, then go through and remove any unnecessary environmental variables whose variance is represented elsewhere in another measure.
+
+```{r}
+env.PCA <- princomp(envdata)
+summary(env.PCA)
+```
+
+It appears the first two PCA components capture nearly all the data variability. However, I will grab the variable with the highest loading from the first 4 principle components (so it can be compared to the below method two)
+
+```{r}
+env.PCA$loadings[,1:4]
+```
+
+Looks like TempSeasonality, Annual Precipitation, PrecipitationofWarmestQuarter, and PrecipitationofWarmestQuarter are the most important.
+
+```{r}
+PCApredictions <- envdata[c(6,14,18:19)]
+str(PCApredictions)
+```
+
+
+#### Method two: R squared to identify correlated environmental predictors
+
+For more information on using this approach, use this [RDA vignette](https://popgen.nescent.org/2018-03-27_RDA_GEA.html). The r squared values generated by the below approach should guide your variable choice. For variable pairs that are highly colinear, remove one, preferencing the exclusion of variables that are colinear with multiple other measures (r squared value of > 0.7 is considered "high"). As noted above though, when the sampled environments are more similar, as is the case with this cane toad dataset, we will see more collinearity.
+
+*Note: given we are using so many environmental variables, some may be cut off on your plot. Either adjust the plot or progressively remove variables.*
+
+
+```{r Env_VIF, warning=FALSE, message=FALSE}
+library(psych)
+pairs.panels(envdata[,3:19], scale=T)
+```
+
+You may end up with something like this (though note the strong relationship annual mean temp has too nearly all the environmental variables):
+
+```{r Env_VIF2, warning=FALSE, message=FALSE}
+VIFpredictions <- envdata[c(3,6,8,14)]
+str(VIFpredictions)
+pairs.panels(VIFpredictions, scale=T)
+```
+
+#### Method three: Variance Inflation Factors to identify correlated environmental predictors
+
+I would recommend using one of the above two methods to remove variables that are supper collinear, then use this last method to refine predictor choice. Simple use the **vif.cca** function to check variance inflation factors for each predictor, and sequentially remove the highest one until you have an appropriate number of predictors.
+
+HOWEVER, this needs to be run after the RDA has been ordinated (notice how it calls *ToadVars.rda*). So jump back up here once you have finished off step 3.2.
+
+```{r eval = FALSE}
+vif.cca(ToadVars.rda) #this code will reappear below in step 3.2
+```
+
+We have now finished preparing the environmental data (the **explanatory variables**) for our RDA analysis. Depending on the method used, we either have the environmental dataset PCApredictions, or VIFpredictions. 
+
+
+## Conducting the RDA
+
+### Step 3.1 Ordinating the data/do the RDA
+
+```{r warning=FALSE, message=FALSE}
+library(vegan)
+ToadVars.rda <- rda(ToadVars ~ AnnualMeanTemp + TempSeasonality + MinTempofColdestMonth + AnnualPrecipitation, data=VIFpredictions, scale=T)
+ToadVars.rda
+
+```
+
+### Step 3.2 Check the RDA
+
+We can now check how much variation is explained by out RDA.
+
+```{r}
+RsquareAdj(ToadVars.rda)
+```
+
+3.6% is not large, but then consider that phenotype is the end result of a large number of factors (genetics, epigenetics etc...), of which environmental effects are only one! And our environmental data set does not even use all environment data.
+
+```{r}
+screeplot(ToadVars.rda) #to determine how many RDA axes there are / are important if there are many
+
+
+signif.full <- anova.cca(ToadVars.rda, parallel=getOption("mc.cores"))
+signif.full # test for model significance
+
+vif.cca(ToadVars.rda) # HERE IT IS! Get variance inflation factors for each predictor (refer to step 2.2, method three) 
+```
+
+The last quality check repots back some high VIF values. This is not entirely unexpected as our VIFpredictions dataset had high collinearity for AnnualMeanTemp. If we were to redo this with PCApredictions we may have lower numbers, indicating it would be better to use the variables generated by the PCA.   
+
+### Step 3.3 Visualise the RDA
+
+We will proceed with graphing our RDA.
+
+```{r}
+plot(ToadVars.rda, scaling=3)
+```
+
+RDA may be interpreted similarly to PCA, with each ordination axis capturing some of the data variance. The blue arrows indicate the magnitude and direction of the environmental predictors. The arrangement of the circles (the toads), the red crosses (our phenotypic measurements) and the environmental predictors against the different axis informs us what is loaded on each of said axis.
+
+Now we can format it to make it more intuitive.
+
+```{r}
+location <- c((rep("NT",30)),(rep("QLD",57)),(rep("WA",34)))
+
+VIFpredictions <- cbind(VIFpredictions,location)
+str(VIFpredictions)
+
+levels(VIFpredictions$location) <- c("NT","QLD","WA")
+eco <- VIFpredictions$location
+bg <- c("#2ACBB3","#602ACB","#A2C61C")
+
+plot(ToadVars.rda, type="n", scaling=3)
+points(ToadVars.rda, display="species", pch=20, cex=0.7, col="gray32", scaling=3)           # the phenotypes
+points(ToadVars.rda, display="sites", pch=21, cex=1.3, col="gray32", scaling=3, bg=bg[eco]) # the toads
+text(ToadVars.rda, scaling=3, display="bp", col="#0868ac", cex=1)                           # the environmental predictors
+legend("bottomright", legend=levels(eco), bty="n", col="gray32", pch=21, cex=1, pt.bg=bg)
+```
+
+Trying to label the phenotypic variables
+
+```{r}
+plot(ToadVars.rda, type="n", scaling=3, choices=c(1,3))
+points(ToadVars.rda, display="species", pch=20, cex=0.7, col="gray32", scaling=3)           # the phenotypes
+#text (ToadVars.rda, display="species", cex=0.65, pos=3,col="red")
+points(ToadVars.rda, display="species", pch=21, cex=1.3, col="gray32", scaling=3) # the toads
+points(ToadVars.rda, display="sites", pch=21, cex=1.3, col="gray32", scaling=3, bg=bg[eco]) # the toads
+text(ToadVars.rda, scaling=3, display="bp", col="#0868ac", cex=1)                           # the environmental predictors
+legend("bottomright", legend=levels(eco), bty="n", col="gray32", pch=21, cex=1, pt.bg=bg)
+```
+
+```{r}
+load.rda <- scores(ToadVars.rda, choices=c(1:3), display="species")
+outliers <- function(x,z){
+  lims <- mean(x) + c(-1, 1) * z * sd(x)     # find loadings +/-z sd from mean loading     
+  x[x < lims[1] | x > lims[2]]               # locus names in these tails
+}
+
+# check for normal distribution
+hist(load.rda[,1], main="Loadings on RDA1")
+hist(load.rda[,2], main="Loadings on RDA2")
+hist(load.rda[,3], main="Loadings on RDA3")
+
+# get number of candidates > 1.5 SDs from mean loading
+cand1 <- outliers(load.rda[,1],1.5) 
+cand2 <- outliers(load.rda[,2],1.5) 
+cand3 <- outliers(load.rda[,2],1.5)
+cand1
+cand2
+cand3
+```
