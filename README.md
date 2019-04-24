@@ -26,9 +26,10 @@
   <div id="how-can-we-use-rda-in-other-ways" class="section level2">
 <h2>How can we use RDA in other ways?</h2>
 <p>Below I apply the approach to a multivariate phenotypic dataset. The aim is to see if the environmental data associated with the areas from which the wild-caught toads were collected carry any explanatory power for various phenotypic measures. I.e. we want to explore the link between environment and phenotype. As listed above, RDA can help you pick out environmental correlations in genotype data, and could conceivably be used to link genotype measures to that of phenotype.</p>
-<center>
-![Test](/Images/AnalysisTriangle.png)
-</center>    
+
+![ScreenShot](/Images/AnalysisTriangle.png)
+ 
+
 <p>Use of RDA for the below analysis can be either quantitative or qualitative. The direct RDA outputs may be useful for you, or they may simply serve as an exploratory tool to direct further analysis.</p>
 </div>
   <div id="introducing-the-data-set-cane-toads" class="section level2">
