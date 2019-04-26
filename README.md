@@ -290,7 +290,10 @@ str(VIFpredictions)</code></pre>
 ##  $ MinTempofColdestMonth: num  164 164 164 164 164 164 164 164 164 164 ...
 ##  $ AnnualPrecipitation  : num  1395 1395 1395 1395 1395 ...</code></pre>
 <pre class="r"><code>pairs.panels(VIFpredictions, scale=T)</code></pre>
-<p>![ScreenShot](/Images/Paired_panel2.png)</p>
+<p>
+  
+![ScreenShot](/Images/Paired_panel2.png)
+
 </div>
 <div id="method-three-variance-inflation-factors-to-identify-correlated-environmental-predictors" class="section level4">
 <h4>Method three: Variance Inflation Factors to identify correlated environmental predictors</h4>
@@ -340,8 +343,9 @@ ToadVars.rda</code></pre>
 <p>3.6% is not large, but then consider that phenotype is the end result of a large number of factors (genetics, epigenetics etc…), of which environmental effects are only one! And our environmental data set does not even use all environment data.</p>
 <pre class="r"><code>screeplot(ToadVars.rda) #to determine how many RDA axes there are / are important if there are many</code></pre>
 <p>
+  
  ![ScreenShot](/Images/plot1.png)
-  </p>
+ 
 <pre class="r"><code>signif.full &lt;- anova.cca(ToadVars.rda, parallel=getOption(&quot;mc.cores&quot;))
 signif.full # test for model significance</code></pre>
 <pre><code>## Permutation test for rda under reduced model
@@ -365,7 +369,11 @@ signif.full # test for model significance</code></pre>
 <h3>Step 3.3 Visualise the RDA</h3>
 <p>We will proceed with graphing our RDA.</p>
 <pre class="r"><code>plot(ToadVars.rda, scaling=3)</code></pre>
-<p>![ScreenShot](/Images/rda1.png)</p>
+<p>
+  
+  ![ScreenShot](/Images/rda1.png)
+  
+  
 <p>RDA may be interpreted similarly to PCA, with each ordination axis capturing some of the data variance. The blue arrows indicate the magnitude and direction of the environmental predictors. The arrangement of the circles (the toads), the red crosses (our phenotypic measurements) and the environmental predictors against the different axis informs us what is loaded on each of said axis.</p>
 <p>Now we can format it to make it more intuitive.</p>
 <pre class="r"><code>location &lt;- c((rep(&quot;NT&quot;,30)),(rep(&quot;QLD&quot;,57)),(rep(&quot;WA&quot;,34)))
@@ -388,8 +396,9 @@ points(ToadVars.rda, display=&quot;sites&quot;, pch=21, cex=1.3, col=&quot;gray3
 text(ToadVars.rda, scaling=3, display=&quot;bp&quot;, col=&quot;#0868ac&quot;, cex=1)                           # the environmental predictors
 legend(&quot;bottomright&quot;, legend=levels(eco), bty=&quot;n&quot;, col=&quot;gray32&quot;, pch=21, cex=1, pt.bg=bg)</code></pre>
 <p>
+  
 ![ScreenShot](/Images/rda2.png)
-</p>
+
 <p>Trying to label the phenotypic variables</p>
 <pre class="r"><code>plot(ToadVars.rda, type=&quot;n&quot;, scaling=3, choices=c(1,3))
 points(ToadVars.rda, display=&quot;species&quot;, pch=20, cex=0.7, col=&quot;gray32&quot;, scaling=3)           # the phenotypes
@@ -399,8 +408,9 @@ points(ToadVars.rda, display=&quot;sites&quot;, pch=21, cex=1.3, col=&quot;gray3
 text(ToadVars.rda, scaling=3, display=&quot;bp&quot;, col=&quot;#0868ac&quot;, cex=1)                           # the environmental predictors
 legend(&quot;bottomright&quot;, legend=levels(eco), bty=&quot;n&quot;, col=&quot;gray32&quot;, pch=21, cex=1, pt.bg=bg)</code></pre>
 <p>
+  
 ![ScreenShot](/Images/rda3.png)
-</p>
+
 <pre class="r"><code>load.rda &lt;- scores(ToadVars.rda, choices=c(1:3), display=&quot;species&quot;)
 outliers &lt;- function(x,z){
   lims &lt;- mean(x) + c(-1, 1) * z * sd(x)     # find loadings +/-z sd from mean loading     
@@ -410,16 +420,19 @@ outliers &lt;- function(x,z){
 # check for normal distribution
 hist(load.rda[,1], main=&quot;Loadings on RDA1&quot;)</code></pre>
 <p>
+  
   ![ScreenShot](/Images/loading1.png)
-</p>
+
 <pre class="r"><code>hist(load.rda[,2], main=&quot;Loadings on RDA2&quot;)</code></pre>
 <p>
+  
 ![ScreenShot](/Images/loading2.png)
-</p>
+
 <pre class="r"><code>hist(load.rda[,3], main=&quot;Loadings on RDA3&quot;)</code></pre>
 <p>
+  
  ![ScreenShot](/Images/loading3.png)
-</p>
+
 <pre class="r"><code># get number of candidates &gt; 1.5 SDs from mean loading
 cand1 &lt;- outliers(load.rda[,1],1.5) 
 cand2 &lt;- outliers(load.rda[,2],1.5) 
